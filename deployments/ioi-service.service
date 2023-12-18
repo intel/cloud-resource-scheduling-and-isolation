@@ -1,0 +1,19 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+
+[Unit]
+Description=ioi-service
+
+[Service]
+ExecStartPre=mkdir -p /run/io-isolation
+ExecStart=/usr/local/bin/ioi-service -v 2
+ExecStopPost=rm /run/io-isolation/ioi-service.sock
+
+# Restart=always
+# RestartSec=5
+# Only systemd 226 and above support this version.
+TasksMax=infinity
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target

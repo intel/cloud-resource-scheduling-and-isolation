@@ -1,0 +1,293 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent-daemon
+  namespace: ioi-system
+spec:
+  selector:
+    matchLabels:
+      name: daemon-node-agent
+  template:
+    metadata:
+      labels:
+        name: daemon-node-agent
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: ioisolation
+                operator: Exists
+      serviceAccountName: node-agent
+      automountServiceAccountToken: true
+      initContainers:
+      - name: init-service
+        image: INIT_SERVICE_IMAGE
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: dbus-socket
+          mountPath: /var/run/dbus/system_bus_socket
+        - name: binary-dir
+          mountPath: /usr/local/bin
+        - name: rdt-env
+          mountPath: /etc/ioi-service
+        - name: service-systemd
+          mountPath: /usr/lib/systemd/system
+        - name: tls
+          mountPath: /etc/ioi/service/pki
+        securityContext:
+          privileged: true
+        env:
+        - name: Node_Name
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      containers:
+        - name: csi-provisioner
+          image: registry.k8s.io/sig-storage/csi-provisioner:v3.3.0
+          args:
+            - --v=2
+            - --csi-address=/csi/csi.sock
+            - --feature-gates=Topology=true
+            - --extra-create-metadata=true
+            - --capacity-ownerref-level=0 # pod is owner
+            - --node-deployment=true
+            - --strict-topology=true
+            - --immediate-topology=false
+            - --worker-threads=5
+          env:
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          securityContext:
+            # This is necessary only for systems with SELinux, where
+            # non-privileged sidecar containers cannot access unix domain socket
+            # created by privileged CSI driver container.
+            privileged: true
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+
+        - name: node-driver-registrar
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.6.0
+          args:
+            - --v=2
+            - --csi-address=/csi/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath/csi.sock
+          securityContext:
+            # This is necessary only for systems with SELinux, where
+            # non-privileged sidecar containers cannot access unix domain socket
+            # created by privileged CSI driver container.
+            privileged: true
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+          volumeMounts:
+          - mountPath: /csi
+            name: socket-dir
+          - mountPath: /registration
+            name: registration-dir
+
+        - name: node-agent
+          image: NODEAGENT_IMAGE
+          imagePullPolicy: IfNotPresent
+          args:
+            - --v=2
+          # Mount the volume that contains the configuration data 
+          # into your container filesystem
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 8080
+              name: metrics-port
+            - containerPort: 8997
+              name: aggregator-port
+            # - containerPort: 9898
+            #   name: healthz
+            #   protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthy
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 300
+            periodSeconds: 120
+            successThreshold: 1
+            failureThreshold: 3
+            timeoutSeconds: 120
+          volumeMounts:
+            # `name` here must match the name
+            # from the volumes section of this pod
+            - name : profile
+              mountPath: /opt/diskProfiler
+            - name: disk-path
+              mountPath: /opt/ioi
+              mountPropagation: HostToContainer
+            - name: profile-nic
+              mountPath: /sys/class/net/
+            - name: nri
+              mountPath: /var/run/nri.sock
+            - name: ioi-sock
+              mountPath: /run/io-isolation
+            - name: tls
+              mountPath: /etc/ioi/service/pki
+            - name: root-ca
+              mountPath: /etc/ioi/control/pki/root-ca.crt
+              subPath: root-ca.crt
+              readOnly: true
+            - name: root-ca
+              mountPath: /etc/ioi/control/pki/root-ca.key
+              subPath: root-ca.key
+              readOnly: true
+            - mountPath: /csi
+              name: socket-dir
+            - mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+              name: mountpoint-dir
+            - mountPath: /var/lib/kubelet/plugins
+              mountPropagation: Bidirectional
+              name: plugins-dir
+            - mountPath: /dev
+              name: dev-dir
+            - name: host-cgroup-root
+              mountPath: /opt/ioi/cgroup
+            - name: host-proc
+              mountPath: /opt/ioi/proc
+            - name: var-run-netns
+              mountPath: /opt/ioi/run/netns
+              mountPropagation: HostToContainer
+            - name: var-lib-kubelet-cert
+              mountPath: /opt/ioi/pki/kubelet.crt
+              mountPropagation: HostToContainer
+          env:
+            - name: Node_Name
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: Node_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: Pod_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: CSI_VERSION
+              value: "5"
+            - name: CSI_DRIVERNAME
+              value: "localstorage.csi.k8s.io"
+      # Add the ConfigMap as a volume to the Pod
+      hostPID: true
+      volumes:
+        # `name` here must match the name
+        # specified in the volume mount
+        - name: profile
+          hostPath:
+            path: /opt/diskProfiler
+        - name: disk-path
+          hostPath:
+            path: /opt/ioi
+            type: DirectoryOrCreate
+        - name: profile-nic
+          hostPath:
+            path: /sys/class/net/
+        - name: nri
+          hostPath:
+            path: /var/run/nri/nri.sock
+        - name: tls
+          hostPath:
+            path: /etc/ioi/service/pki
+            type: DirectoryOrCreate
+        - name: ioi-sock
+          hostPath:
+            path: /run/io-isolation
+            type: DirectoryOrCreate
+        - name: root-ca
+          secret:
+            secretName: ca-secret
+        - hostPath:
+            path: /var/lib/kubelet/plugins/csi-hostpath
+            type: DirectoryOrCreate
+          name: socket-dir
+        - hostPath:
+            path: /var/lib/kubelet/pods
+            type: DirectoryOrCreate
+          name: mountpoint-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: Directory
+          name: registration-dir
+        - hostPath:
+            path: /var/lib/kubelet/plugins
+            type: Directory
+          name: plugins-dir
+        - hostPath:
+            path: /dev
+            type: Directory
+          name: dev-dir
+        - hostPath:
+            path: /sys/fs/cgroup/
+            type: ""
+          name: host-cgroup-root
+        - hostPath:
+            path: /proc/
+            type: ""
+          name: host-proc
+        - hostPath:
+            path: /var/run/netns
+            type: ""
+          name: var-run-netns
+        - hostPath:
+            path: /var/lib/kubelet/pki/kubelet.crt
+            type: ""
+          name: var-lib-kubelet-cert
+        - name: dbus-socket
+          hostPath:
+            path: /var/run/dbus/system_bus_socket
+            type: Socket
+        - name: binary-dir
+          hostPath:
+            path: /usr/local/bin
+            type: Directory
+        - name: rdt-env
+          hostPath:
+            path: /etc/ioi-service
+            type: DirectoryOrCreate
+        - name: service-systemd
+          hostPath:
+            path: /usr/lib/systemd/system
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-agent-daemon
+  namespace: ioi-system
+spec:
+  selector:
+    name: daemon-node-agent
+  ports:
+    - name: node-agent-monitor
+      protocol: TCP
+      port: 8080
+      targetPort: metrics-port
+    - name: service-for-aggregator
+      protocol: TCP
+      port: 8997
+      targetPort: aggregator-port

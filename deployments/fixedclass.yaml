@@ -1,0 +1,61 @@
+engines:
+  - name: FixedClass
+    config: |
+      policy:
+        type: FixedClass
+        config: |
+          configPath: /etc/ioi-service/ioi-rdt-service.cfg
+      watchers:
+        - type: pid_watcher
+          config: |
+            interval: 3
+      monitors:
+        - type: l3_monitor
+          config: |
+            interval: 1
+        - type: mb_monitor
+          config: |
+            interval: 1
+      executors:
+        - type: rdt_executor
+          config: |
+            test: 2
+
+#engine:
+#  name: RDTEngine
+#  config: |
+#    - name: FixedClassPolicy
+#      config: |
+#        classes:
+#          - guaranteed
+#          - burstable
+#          - besteffort
+#        adjustments:
+#          adjustment1:
+#            threshold:
+#              cpuUtilization:
+#                guaranteed: 70
+#            adjustmentResource: adjustmentResource1
+#          adjustment2:
+#            threshold:
+#              cpuUtilization:
+#                guaranteed: 50
+#            adjustmentResource: adjustmentResource2
+#        monitors:
+#          - name: FixedClassMonitor
+#            config: |
+#              updateInterval: 30
+#        executors:
+#          - name: FixedClassExecutor
+#            config: |
+#              adjustmentResource:
+#                adjustmentResource1:
+#                  l3Allocation:
+#                    guaranteed: "0xfe0"
+#                    besteffort: "0x010"
+#                adjustmentResource2:
+#                  l3Allocation:
+#                    guaranteed: "0xfc0"
+#                    besteffort: "0x030"
+#
+#

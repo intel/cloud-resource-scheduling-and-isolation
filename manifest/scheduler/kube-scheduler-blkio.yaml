@@ -1,0 +1,23 @@
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: /var/run/kubernetes/scheduler.kubeconfig
+leaderElection:
+  leaderElect: false
+profiles:
+- schedulerName: default-scheduler
+  plugins:
+    filter:
+      enabled:
+      - name: ResourceIO
+    score:
+      enabled:
+      - name: ResourceIO
+    reserve:
+      enabled:
+      - name: ResourceIO
+  pluginConfig:
+    - name: ResourceIO
+      args:
+        scoreStrategy: LeastAllocated
+        resourceType: BlockIO

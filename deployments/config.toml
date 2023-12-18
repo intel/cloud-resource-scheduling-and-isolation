@@ -1,0 +1,5 @@
+[plugins]
+  [plugins."ioi.v1"]
+    enable = true
+    idx = "00"
+

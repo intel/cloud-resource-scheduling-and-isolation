@@ -1,0 +1,39 @@
+apiVersion: ioi.intel.com/v1
+kind: NodeIOStatus
+metadata:
+  name: 127.0.0.1-nodeiostatus
+  namespace: ioi-system
+spec:
+  nodeName: 127.0.0.1
+  generation: 2
+  reservedPods:
+    pod1:
+      name: pod1
+      namespace: default
+status:
+  observedGeneration: 1
+  allocatableBandwidth:
+    BlockIO:
+      deviceIOStatus:
+        678-456:
+          ioPoolStatus:
+            GA:
+              total: 100
+              in: 100
+              out: 100
+            BE:
+              total: 100
+              in: 100
+              out: 100
+    # RDT:
+    #   deviceIOStatus:
+    #     678-456:
+    #       ioPoolStatus:
+    #         GA:
+    #           total: 0
+    #           in: 0
+    #           out: 0
+    #         BE:
+    #           total: 0
+    #           in: 0
+    #           out: 0

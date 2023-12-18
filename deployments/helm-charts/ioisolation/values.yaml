@@ -1,0 +1,25 @@
+# Default values for ioisolation.
+# This is a YAML-formatted file.
+deploySeperatedCSI: false
+namespace: ioi-system
+image:
+  repository: 127.0.0.1:5000
+  pullPolicy: IfNotPresent
+  tag: release-v0.8.0
+namespaceWhitelist:
+- ioi-system
+- kube-system
+- kube-flannel
+nodeAgentConfig:
+  profilerTimes: 1
+  netBEPool: 20
+  diskBEPool: 20
+  netSystemPool: 20
+  diskSystemPool: 20
+  diskMinReadBw: 4
+  diskMinWriteBw: 4
+  netMinSendBw: 4
+  netMinRecvBw: 4
+  netReportInterval: 1
+  diskReportInterval: 2
+  rdtReportInterval: 30

@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aggregator
+  namespace: ioi-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: dp-aggregator
+  template:
+    metadata:
+      labels:
+        name: dp-aggregator
+    spec:
+      securityContext:
+        fsGroup: 1000
+      # nodeSelector:
+      #   # todo: multiple control plane case
+      #   node-role.kubernetes.io/control-plane: ""
+      tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      serviceAccountName: aggregator
+      automountServiceAccountToken: true
+      volumes:
+        - name: admin-configmap-volume
+          configMap:
+            name: admin-configmap
+        - name: tls
+          secret:
+            secretName: ca-secret
+
+      containers:
+        - name: aggregator
+          image: AGGREGATOR_IMAGE
+          imagePullPolicy: IfNotPresent
+          args:
+          - --v=2
+          - --direct=false
+          - --updateInterval=5s
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          ports:
+          - containerPort: 9988
+            name: server-port
+          volumeMounts:
+            - name: admin-configmap-volume
+              mountPath: /etc/config/
+            - name: tls
+              mountPath: /etc/ioi/control/pki/root-ca.crt
+              subPath: root-ca.crt
+              readOnly: true
+            - name: tls
+              mountPath: /etc/ioi/control/pki/root-ca.key
+              subPath: root-ca.key
+              readOnly: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aggregator
+  namespace: ioi-system
+spec:
+  selector:
+    aggregator-role: endpoint-aggregator
+  ports:
+    - name: aggregator-port
+      protocol: TCP
+      port: 9988
+      targetPort: server-port

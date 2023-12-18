@@ -1,0 +1,253 @@
+/*
+Copyright (C) 2025 Intel Corporation
+SPDX-License-Identifier: Apache-2.0
+*/
+
+//
+// ioisolation.proto
+//
+// communicate with node agent
+//
+syntax = "proto3";
+
+option go_package = "sigs.k8s.io/IOIsolation/pkg/api/ioiservice;ioiservice";
+
+service ioiservice {
+  rpc Configure (ConfigureRequest) returns (ConfigureResponse);
+  rpc GetServiceInfo(ServiceInfoRequest) returns (ServiceInfoResponse);
+  rpc SetAppLimit (SetAppLimitRequest) returns (SetAppLimitResponse);
+  rpc GetAppLimit (GetAppLimitRequest) returns (GetAppLimitResponse);
+  rpc RegisterApp (RegisterAppRequest) returns (RegisterAppResponse);
+  rpc UnRegisterApp (UnRegisterAppRequest) returns (UnRegisterAppResponse);
+  rpc Subscribe (SubscribeContext) returns (stream AppsBandwidth);
+}
+
+enum ResponseState {
+  OK = 0;
+  FAIL = 1;
+}
+
+message ConfigureRequest {
+  string type = 1;
+  string configure = 2;
+  int32 ioi_type = 3;
+  /*
+   type=SYSTEM // for net
+   {
+    cni: "flannel",
+    gateway_ip: "10.243.0.1",
+    node_ips: [
+      { 
+        interface_name: "ens160",
+        ip_addr: "10.249.231.103",
+        mac_addr: "",
+        type: "",
+      }
+    ],
+    groups: [
+      { //GA
+        id: 0,
+        type: 0, // control app based on app or group level
+        pool: 1000,
+        queues: 4,
+      },
+      { // BT
+        id: 1,
+        type: 1,
+        pool: 1000, 
+        queues: 4,
+      },
+      { //BE
+        id: 2,
+        type: 2,
+        pool: 400, 
+        queues: 4,
+      }
+    ]
+   }
+
+   type=LOGLEVEL // for all
+   configure: {
+    info: true
+    debug: true
+   }
+   */
+}
+
+message ConfigureResponse {
+  ResponseState status = 1;
+  string responseInfo  = 2;
+  /*
+    {
+      groups: [
+      {
+        id: 0,
+        group_settable: true
+      },
+      {
+        id: 1,
+        group_settable: false
+      },
+      {
+        id: 2,
+        group_settable: false
+      }
+    ]
+    }
+  */
+}
+
+message ServiceInfoRequest {
+  int32 ioi_type = 1;   // 0 for disk, 1 for network
+  string req = 2;
+  /*
+  for network io:
+  {
+    ip: "10.***.***.***"
+  }
+  */
+}
+
+message ServiceInfoResponse {
+  int32 type = 1;   // 0 for disk, 1 for network
+  string version = 2;
+  int32 mode = 3;   // adq or software
+  string configuration = 4;   // include tc id, name and type
+  /*
+  for network io:
+  {
+    mac_addr: "d4:5d:df:09:9e:19",
+    interface_name: "eno2",
+    default_speed: 1000,
+    group_settable: true
+    queue_num: 16 // this field is used to calculate queue_num in Configure: queue num of each group = (queue_num - 2)/2  -((queue_num - 2)/2)%2 
+  }
+  */
+  ResponseState status = 5;
+}
+
+message RegisterAppRequest {
+  string app_name = 1;
+  // app_info
+  string app_info = 2;
+  int32 ioi_type = 3;
+  /*
+  for disk io:
+  {
+    cgroup_path: "",
+    devices:
+    {
+      "disk_mm": "8:0",
+    }
+  }
+
+  for network io:
+  {
+    group: "group index"
+    netns: "netns_asdf",
+    devices: {
+      "eth0": "10.244.3.1",
+    },
+  }
+  */
+}
+
+message RegisterAppResponse {
+  ResponseState status = 1;
+  string app_id = 2;
+}
+
+message UnRegisterAppRequest {
+  int32 ioi_type = 3;
+  string app_id = 1;
+}
+
+message UnRegisterAppResponse {
+  ResponseState status = 1;
+}
+
+message SetAppLimitRequest {
+  /*
+    "group_id.appid"
+    if appid is empty, will only set limit for this group
+    else will set limit for this app
+  */
+  int32 ioi_type = 3;
+  string app_id = 1;
+  repeated BWLimit limit = 2;
+}
+
+message SetAppLimitResponse {
+  ResponseState status = 1;
+}
+
+message GetAppLimitRequest {
+  string app_id = 1;
+}
+
+message GetAppLimitResponse {
+  ResponseState status = 1;
+  repeated BWLimit bw_limit = 2;
+}
+
+message BWLimit {
+  string id = 1; // device key
+  string in = 2; // ingress or rbps
+  string out = 3; // egress or wbps
+  int64  in_iops = 4; // ingress in iops
+  int64  out_iops = 5; // egress out iops
+}
+
+message SubscribeContext {
+  // ioi_type = 0 => subscribe all payloads
+  // ioi_type = 1 => subscribe disk io bw payload
+  // ioi_type = 2 => subscribe network io bw payload
+  // ioi_type = 3 => subscribe rdt info payload
+  // ioi_type = 4 => subscribe rdt quantity info payload
+  int32 ioi_type = 1;
+}
+
+message AppsBandwidth {
+  int32 ioi_type = 1;
+  oneof payload {
+    AppDiskIOBandwidth disk_io_bw = 2;
+    AppNetworkIOBandwidth network_io_bw = 3;
+    RDTInfo rdt_info = 4;
+  }
+}
+
+message RDTInfo{
+  // key -> class name, value -> info
+  map<string, double> class_info = 1;
+}
+
+message AppDiskIOBandwidth {
+  // key -> app_id, value -> AppBandwidthInfo
+  map<string, AppBandwidthInfo> app_bw_info = 1;
+}
+
+message AppBandwidthInfo {
+  repeated BandwidthInfo bw_info = 2;
+}
+
+message BandwidthInfo {
+  // different block size => bw
+  string id = 1; // device id
+  bool is_read = 2; // read / write
+  map<string, string> bandwidths = 3; // 1k -> 100M, 4k -> 400M
+}
+
+message AppNetworkIOBandwidth {
+  // key -> app_id, value -> AppBandwidthInfo
+  map<string, AppNetworkBandwidthInfo> app_bw_info = 1;
+}
+
+message AppNetworkBandwidthInfo {
+  repeated NetworkBandwidthInfo bw_info = 2;
+}
+
+message NetworkBandwidthInfo {
+  string id = 1; // device id
+  bool is_ingress = 2; // ingress=0 / egress=1
+  string value = 3; // 100Mbps
+}

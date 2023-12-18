@@ -1,0 +1,21 @@
+kind: ConfigMap 
+apiVersion: v1 
+metadata:
+  name: policy-configmap
+  namespace: {{ .Values.namespace }}
+data:
+  # Set pool ratio
+  DiskGroup: |
+    DiskGArules:Default
+    DiskBTrules:Default
+    DiskBErules:Default
+  NetGroup: |
+    NetGArules:Default
+    NetBTrules:Default
+    NetBErules:Default
+  Default: |
+    Throttle:POOL_SIZE
+    Select_method:All
+    Compress_method:CALC_REQUEST_RATIO
+    Decompress_method:CALC_REQUEST_RATIO
+    Report_Flag: GUARANTEE_ELASTICITY

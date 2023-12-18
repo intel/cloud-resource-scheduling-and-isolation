@@ -1,0 +1,30 @@
+apiVersion: ioi.intel.com/v1
+kind: NodeStaticIOInfo
+metadata:
+  name: 127.0.0.1-nodestaticioinfo
+  namespace: ioi-system
+spec:
+  nodeName: 127.0.0.1
+  endpoint: 127.0.0.1:9977
+  resourceConfig:
+    BlockIO:
+      bePool: 20 # the BE ratio of the capacity
+      devices: 
+        678-456:
+          name: /dev/nvme1n1
+          type: default
+          defaultIn: 5 # write * bePool /  (total node’s pod num/10)
+          defaultOut: 5  # read * bePool /  (total node’s pod num/10)
+          readRatio: {"512": 15, "1k": 10, "4k": 6, "8k": 4, "16k": 2}
+          writeRatio: {"512": 14, "1k": 11, "4k": 5, "8k": 3, "16k": 3}
+          capacityIn: 500
+          capacityOut: 500
+          capacityTotal: 1000
+status:
+  deviceStates:
+    678-456:
+      state: NotEnabled
+      deviceInUse: false
+
+
+

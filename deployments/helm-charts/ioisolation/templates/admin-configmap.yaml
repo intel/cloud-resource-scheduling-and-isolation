@@ -1,0 +1,34 @@
+kind: ConfigMap 
+apiVersion: v1 
+metadata:
+  name: admin-configmap
+  namespace: {{ .Values.namespace }}
+data:
+  # Set pool ratio
+  diskpools: | 
+    bePool={{ .Values.nodeAgentConfig.diskBEPool }}
+    sysPool={{ .Values.nodeAgentConfig.diskSystemPool }}
+  networkpools: |
+    bePool={{ .Values.nodeAgentConfig.netBEPool }}
+    sysPool={{ .Values.nodeAgentConfig.netSystemPool }}
+  min_pod_bw: |
+    disk_read={{ .Values.nodeAgentConfig.diskMinReadBw }}
+    disk_write={{ .Values.nodeAgentConfig.diskMinWriteBw }}
+    net_send={{ .Values.nodeAgentConfig.netMinSendBw }}
+    net_receive={{ .Values.nodeAgentConfig.netMinRecvBw }}
+  loglevel: |
+    nodes=
+    level=warn
+  namespaceWhitelist: |
+  {{- range .Values.namespaceWhitelist }}
+    {{ . }}
+  {{- end }}
+  diskRatio: |
+    system=50
+  reportInterval: |
+    netInterval={{ .Values.nodeAgentConfig.netReportInterval }}
+    diskInterval={{ .Values.nodeAgentConfig.diskReportInterval }}
+    rdtInterval={{ .Values.nodeAgentConfig.rdtReportInterval }}
+  profiler: |
+    times={{ .Values.nodeAgentConfig.profilerTimes }}
+

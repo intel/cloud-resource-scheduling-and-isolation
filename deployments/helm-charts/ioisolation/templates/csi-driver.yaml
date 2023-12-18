@@ -1,0 +1,23 @@
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: localstorage.csi.k8s.io
+  labels:
+    app.kubernetes.io/instance: localstorage.csi.k8s.io
+    app.kubernetes.io/part-of: csi-driver-local-storage
+    app.kubernetes.io/name: localstorage.csi.k8s.io
+    app.kubernetes.io/component: csi-driver
+spec:
+  # Supports persistent volumes.
+  volumeLifecycleModes:
+  - Persistent
+  # - Ephemeral
+  # To determine at runtime which mode a volume uses, pod info and its
+  # "csi.storage.k8s.io/ephemeral" entry are needed.
+  podInfoOnMount: true
+  # No attacher needed.
+  attachRequired: false
+  storageCapacity: false
+  # Kubernetes may use fsGroup to change permissions and ownership 
+  # of the volume to match user requested fsGroup in the pod's SecurityPolicy
+  fsGroupPolicy: File

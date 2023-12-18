@@ -1,0 +1,194 @@
+# Copyright (C) 2025 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+
+diff --git a/adqsetup.py b/usr/local/lib/python3.6/site-packages/adqsetup.py
+index b577cc4..580367a 100644
+--- a/adqsetup.py
++++ b/usr/local/lib/python3.6/site-packages/adqsetup.py
+@@ -1503,16 +1503,51 @@ class TCMQAttr(NLAttr):
+     MODE_CHANNEL = 1
+     SHAPER_DCB     = 0
+     SHAPER_BW_RATE = 1
+-
++    TYPE_MINRATE = 3
++    TYPE_MAXRATE = 4   
+     _struct = {
+         TYPE_MODE: NLAttr._int_struct("H"),
+-        TYPE_SHAPER: NLAttr._int_struct("H")
++        TYPE_SHAPER: NLAttr._int_struct("H"),
++        TYPE_MINRATE: NLAttr._int_struct("Q"),
++        TYPE_MAXRATE: NLAttr._int_struct("Q")
+     }
+ 
+     def __str__(self):
+         return "TCMQAttr(type=%d, data=%r)" % (self.type, self.data)
+ 
+ 
++class TCMQNestAttr(NLAttr):
++    TYPE_MINRATE = 3
++    TYPE_MAXRATE = 4
++    
++    class _nest_array:
++        _item_type = 0
++        def __init__(self, item_type): # type: (str) -> None
++            self._item_type = item_type
++        @classmethod
++        def pack(cls, obj):
++            data = bytearray([]) # changed
++            for i in range(len(obj)):
++                data = data + obj[i]._bytes
++            return data
++        @classmethod
++        def unpack(cls, data, offset=0, length=0): 
++            results = []
++            item = TCMQAttr(cls._item_type, 0)
++            while offset < len(data):
++                attr =item._from(data, offset)
++                results.append(attr)
++                offset += attr.size
++            return results
++        
++    _struct = {
++        TYPE_MINRATE: _nest_array(TYPE_MINRATE),
++        TYPE_MAXRATE: _nest_array(TYPE_MAXRATE),
++    }
++
++    def __str__(self):
++        return "TCMQNestAttr(type=%d, data=%r)" % (self.type, self.data)
++
+ class TCFLAttr(NLAttr):
+     ## /include/uapi/linux/pkt_cls.h
+     TYPE_CLASSID           = 1
+@@ -1739,6 +1774,10 @@ class TCtool(object):
+                             attrs = TCMQAttr.dict(attr.data, 84)
+                             mode = attrs.get(TCMQAttr.TYPE_MODE, None)
+                             shaper = attrs.get(TCMQAttr.TYPE_SHAPER, None)
++                            print("shaper:", shaper)
++                            attrs_nest = TCMQNestAttr.dict(attr.data, 100)
++                            min_rate=attrs_nest.get(TCMQNestAttr.TYPE_MINRATE, None)
++                            print("list min_rate:", min_rate)
+                             results.append(self.Qdisc(
+                                 msg.parent, kind, num_tc, pmap, hw, 
+                                 count, offset, mode, shaper
+@@ -1750,8 +1789,8 @@ class TCtool(object):
+             return results
+ 
+     def qdisc_add(self, parent=None, kind=None, 
+-            pmap=None, count=None, offset=None):
+-        # type: (int, str, list[int], list[int], list[int]) -> None
++            pmap=None, count=None, offset=None, min_rate=None):
++        # type: (int, str, list[int], list[int], list[int], list[int]) -> None
+         with RNLConn() as conn:
+             handle = 0
+             if parent == self.TC_H_CLSACT:
+@@ -1770,7 +1809,13 @@ class TCtool(object):
+                 pmap = pmap[:max_tc]
+                 count = count[:len(pmap)]
+                 offset = offset[:len(pmap)]
++                minrate = array('Q', [0] * 16)
++                for i in range(len(min_rate)):
++                    pnum = pack("Q", min_rate[i])
++                    num = unpack("Q", pnum)[0] * 125000
++                    minrate[i] = num
+                 # nested attrs
++                min_rates = [TCMQAttr(TCMQAttr.TYPE_MINRATE, minrate[i]) for i in range(16)]
+                 msg.data = msg.data + TCAttr(
+                     TCAttr.TYPE_OPTIONS, 
+                     pack("B", len(pmap)) + _pack_list(pmap, 'B', max_tc) 
+@@ -1778,6 +1823,8 @@ class TCtool(object):
+                     + _pack_list(offset, 'H', max_tc)
+                     + b'\x00' * 2 # DWORD alignment padding
+                     + TCMQAttr(TCMQAttr.TYPE_MODE, TCMQAttr.MODE_CHANNEL)._bytes
++                    + TCMQAttr(TCMQAttr.TYPE_SHAPER, TCMQAttr.SHAPER_BW_RATE)._bytes
++                    + TCMQNestAttr(TCMQNestAttr.TYPE_MINRATE , min_rates)._bytes
+                 )._bytes
+             conn.send(msg)
+             if self.log:
+@@ -2540,7 +2587,8 @@ class ConfigGlobals(ConfigBase):
+         'rxring': int, 
+         'txring': int,
+         'arpfilter': ConfigBase._bool, 
+-        'priority': ConfigBase._str_lower
++        'priority': ConfigBase._str_lower,
++        'min_rate': int
+     }
+ 
+     def __init__(self, source=None): # type: (dict) -> None
+@@ -2564,7 +2612,7 @@ class ConfigGlobals(ConfigBase):
+         self.txring = None
+         self.arpfilter = False
+         self.priority = None
+-
++        self.min_rate = 0
+         # initialize section with source
+         if source is not None:
+             if not isinstance(source, dict):
+@@ -2616,12 +2664,14 @@ class ConfigSection(ConfigBase):
+         'remote_ports': ConfigBase._int_list, 
+         'remote_addrs': ConfigBase._str_list,
+         'cpus': ConfigBase._int_list, 
+-        'numa': ConfigBase._str_lower
++        'numa': ConfigBase._str_lower,
++        "min_rate": int,
+     }
+ 
+     @property
+     def _isfiltered(self): # type: () -> bool
+-        return any([self.addrs, self.ports, self.remote_addrs, self.remote_ports])
++        # return any([self.addrs, self.ports, self.remote_addrs, self.remote_ports])
++        return True
+ 
+     def __init__(self, name=None, source=None): # type (str, dict) -> None
+         '''
+@@ -2638,6 +2688,7 @@ class ConfigSection(ConfigBase):
+         self.addrs = None
+         self.remote_ports = None
+         self.remote_addrs = None
++        self.min_rate = 0
+         # initialize section with source
+         if source is not None:
+             if not isinstance(source, dict):
+@@ -2954,6 +3005,14 @@ class Config(object):
+         if requested > 256:
+             raise Exception("Not enough queues available")
+         
++    def _check_min_rate(self): # type() -> None
++        requested = self.globals.min_rate
++        for sec in self._sections.values():
++            requested += sec.min_rate
++        speed = _readfile("/sys/class/net/%s/speed" % self.globals.dev)
++        if requested > int(speed):
++            raise Exception("Total min_rate exceed device speed")
++        
+     def _cleanup(self): # type: () -> None
+         '''
+         Attempt to cleanup setup from previous run
+@@ -3114,9 +3173,10 @@ class Config(object):
+         tc = TCtool(self.globals.dev, self.log)
+         # create root mqprio qdisc
+         count = [section.queues for _, section in self]
+-        pmap = [i for i in range(len(count))]
++        min_rate = [section.min_rate for _, section in self]
++        pmap = [i for i in range(len(count))] 
+         offset = [sum(count[:i]) for i in range(len(count))]
+-        tc.qdisc_add(tc.TC_H_ROOT, 'mqprio', pmap, count, offset)
++        tc.qdisc_add(tc.TC_H_ROOT, 'mqprio', pmap, count, offset, min_rate)
+         if self._isfiltered \
+                 and not any([t.kind == 'clsact' for t in tc.qdisc_list()]):
+             # create classifier (ingress+egress) qdisc if needed
+@@ -3279,6 +3339,7 @@ class Config(object):
+         self._log("### cleanup ###")
+         self._cleanup()
+         self._check_queues()
++        self._check_min_rate()
+         self.settings = Settings(self.globals.dev, self.log)
+         self._set_sysctls()
+         self._set_interface_flags()
+@@ -3634,6 +3695,7 @@ def _main():
+                     print(err.output.decode().strip())
+                 else:
+                     print(err.output.strip())
++            sys.stderr.write(str(err))
+             return 1
+     else:
+         if args.log: 

@@ -1,0 +1,52 @@
+# Default values for prometheus-demo.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+node_exporter:
+  enabled: true
+
+prometheus:
+  ingress:
+    enabled: false
+
+  configs:
+    scrape_configs:
+      - job_name: 'node-agent-daemon'
+        scheme: http
+        # tls_config:
+        #   insecure_skip_verify: true
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [ __meta_kubernetes_endpoints_name ]
+            regex: 'node-agent-daemon'
+            action: keep
+      - job_name: node-exporter
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - action: keep
+            regex: node-exporter
+            source_labels:
+              - __meta_kubernetes_endpoints_name
+          - source_labels: [ __meta_kubernetes_pod_node_name ]
+            target_label: node
+            regex: (.*)
+            replacement: $1
+            action: replace
+      - job_name: cadvisor
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - action: keep
+            regex: cadvisor
+            source_labels:
+                - __meta_kubernetes_endpoints_name
+          - source_labels: [ __meta_kubernetes_pod_node_name ]
+            target_label: node
+            regex: (.*)
+            replacement: $1
+            action: replace
+
+
+

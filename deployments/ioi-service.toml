@@ -1,0 +1,16 @@
+app_name = 'ioi service'
+node_label = 'disk-net'
+is_tls = false
+
+[disk]
+clear_pod_time = 30
+ebpf_enabled = false
+
+[network]
+clear_pod_time = 30
+is_bridge_cni = true
+enable_subscribe = true
+ifname = 'eth0'
+
+[rdt]
+config-path = '/etc/ioi-service/ioi-rdt-service.cfg'

@@ -1,0 +1,40 @@
+/*
+Copyright (C) 2025 Intel Corporation
+SPDX-License-Identifier: Apache-2.0
+*/
+
+//
+// nodeagent.proto
+//
+// communicate with aggregator
+//
+syntax = "proto3";
+
+option go_package = "sigs.k8s.io/IOIsolation/pkg/api/nodeagent;nodeagent";
+
+package nodeagent;
+
+import "pkg/api/aggregator/aggregator.proto";
+
+service NodeAgent {
+  
+  // UpdateReservedPod bounds/unbounds pod to node
+  rpc UpdateReservedPods (UpdateReservedPodsRequest) returns (aggregator.Empty);
+
+  // GetNodeIOStatuses returns the aggregated actual nodes' IO statuses to clients
+  rpc GetNodeIOStatus (GetNodeIOStatusRequest) returns (GetNodeIOStatusResponse);
+}
+
+message UpdateReservedPodsRequest {
+    string node_name = 1;
+
+    aggregator.PodList reserved_pods = 2;
+}
+
+message GetNodeIOStatusRequest {
+    aggregator.IOType type = 1;
+}
+
+message GetNodeIOStatusResponse {
+    aggregator.IOBandwidth node_io_bw = 1; 
+}

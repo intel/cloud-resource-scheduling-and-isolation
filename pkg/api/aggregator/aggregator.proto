@@ -1,0 +1,127 @@
+/*
+Copyright (C) 2025 Intel Corporation
+SPDX-License-Identifier: Apache-2.0
+*/
+
+//
+// aggregator.proto
+//
+// communicate with node agent
+//
+syntax = "proto3";
+
+option go_package = "sigs.k8s.io/IOIsolation/pkg/api/aggregator;aggregator";
+
+package aggregator;
+
+service IOAggregator4Agent {
+    // UpdateNodeStatus updates the node's actual IO status 
+    rpc UpdateNodeIOStatus (UpdateNodeIOStatusRequest) returns (Empty);
+    
+    // GetReservedPods returns the pod list to node agent
+    rpc GetReservedPods (GetReservedPodsRequest) returns (GetReservedPodsResponse);
+}
+
+message Empty {
+}
+
+message UpdateNodeIOStatusRequest {
+
+    string node_name = 1;
+
+    int64 observed_generation = 2;
+
+    repeated IOBandwidth io_bw = 3;    
+}
+
+message IOBandwidth {
+    // IO type: disk/network IO/rdt
+    IOType io_type = 1;
+    // key -> dev_id, value -> DeviceBandwidthInfo
+    map<string, DeviceBandwidthInfo> device_bw_info = 2;
+}
+
+message DeviceBandwidthInfo {
+    // Device's name
+    string name = 1;
+    // key -> GA/BE/BT, Device's GA and BE pool status
+    map<string, IOStatus> status = 2;
+}
+
+message IOStatus {
+    // Total IO bandwidth capacity in 32k blocksize, for disk IO
+    double total = 1; 
+    // Read IO bandwidth capacity in 32k blocksize
+    double in = 2;  
+    // Write IO bandwidth capacity in 32k blocksize
+    double out = 3;
+    // Pressure indicates how much the resource is in pressure
+    double pressure = 4;
+    // Default is no entry, for disk IO
+    string actual_size = 5;
+}
+
+message PodList {
+    int64 generation = 1;
+    // key -> pod uid
+    map<string, PodRequest> pod_list = 2;
+}
+
+enum IOType {
+    All = 0;
+    DiskIO = 1;
+    NetworkIO = 2;
+    RDT = 3;
+    RDTQuantity = 4;
+}
+
+message PodRequest {
+    // pod name is required by node agent
+    string pod_name = 1;
+
+    string pod_namespace = 2;
+
+    repeated IOResourceRequest request = 3;
+}
+
+message IOResourceRequest {
+
+    IOType io_type = 1;
+   
+    int32 workload_type = 2;
+
+    DeviceRequirement dev_request = 3;
+}
+
+message DeviceRequirement {
+    // Network/Block device name
+    string dev_name = 1;
+
+    Quantity request = 2;
+
+    Quantity limit = 3;
+
+    Quantity raw_request = 4;
+
+    Quantity raw_limit = 5;
+}
+
+message Quantity {
+    // Converted io request read/ingress bandwidth
+    double inbps = 1;  
+    // Converted io request write/egress bandwidth
+    double outbps = 2;
+    // Converted io request read/ingress iops, only for BlockIO
+    double iniops = 3;  
+    // Converted io request write/egress iops, only for BlockIO
+    double outiops = 4;
+}
+
+message GetReservedPodsRequest {
+    string node_name = 1;
+}
+
+message GetReservedPodsResponse {
+
+    PodList pod_list = 2;
+}

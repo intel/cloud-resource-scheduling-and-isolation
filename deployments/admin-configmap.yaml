@@ -1,0 +1,51 @@
+kind: ConfigMap 
+apiVersion: v1 
+metadata:
+  name: admin-configmap
+  namespace: ioi-system
+data:
+  # Set disk IO system reserved/best-effort pool ratio
+  diskpools: | 
+    sysPool=20
+    bePool=20
+  # Set network IO system reserved/best-effort pool ratio
+  networkpools: |
+    sysPool=20
+    bePool=20
+  # min_be_bw is the minimum bandwidth for be pod, the unit is MB/s
+  min_pod_bw: |
+    disk_read=5
+    disk_write=5
+    net_send=5
+    net_receive=5
+  #
+  # Enable/disable info/debug log level for all components
+  # By default, debug and info logs are disabled
+  # nodes is string.contains for node name, for example nodes=node,csi mean the node
+  # name with node or csi.
+  # loglevel: |
+  #  nodes=node, csi
+  #  level=warn
+  #
+  # Configure the whitelist of namespaces that are exempt from IO aware scheduling
+  # the default whitelist includes kube-system and ioi-system.
+  # namespaceWhitelist: |
+  #  kube-flannel
+  #  calico-apiserver
+  #  calico-system
+  #  tigera-operator
+  #
+  # Configure the ratio of disk space to be reserved for ephemeral storage
+  # diskRatio: |
+  #  system=50
+  #
+  # Set the time interval for reporting disk/network IO statistics on each node
+  # By default, the interval is 2 second for network IO and 2 second for disk IO
+  # reportInterval: |
+  #  netInterval=2
+  #  diskInterval=2
+  #  rdtInterval=30
+  #
+  # Set the times for profiling disk IO on each node
+  # profiler: |
+  #  times=1

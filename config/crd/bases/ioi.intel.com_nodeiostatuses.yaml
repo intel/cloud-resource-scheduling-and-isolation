@@ -1,0 +1,97 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+  name: nodeiostatuses.ioi.intel.com
+spec:
+  group: ioi.intel.com
+  names:
+    kind: NodeIOStatus
+    listKind: NodeIOStatusList
+    plural: nodeiostatuses
+    singular: nodeiostatus
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: NodeDiskIOStatusInfo is the Schema for the nodediskiostatusinfoes
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: NodeIOStatusSpec defines the desired state of NodeDiskIOStatus
+            properties:
+              generation:
+                format: int64
+                type: integer
+              nodeName:
+                type: string
+              reservedPods:
+                additionalProperties:
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                  type: object
+                description: a list of pod
+                type: object
+            type: object
+          status:
+            description: NodeIOStatusStatus defines the observed state of NodeIOStatus
+            properties:
+              allocatableBandwidth:
+                additionalProperties:
+                  properties:
+                    deviceIOStatus:
+                      additionalProperties:
+                        properties:
+                          ioPoolStatus:
+                            additionalProperties:
+                              properties:
+                                actualSize:
+                                  description: Default is no entry
+                                  type: string
+                                in:
+                                  description: Read io bandwidth capacity
+                                  type: number
+                                out:
+                                  description: Write io bandwidth capacity
+                                  type: number
+                                pressure:
+                                  description: Pressure indicates if resource's pressure state
+                                  type: number
+                                total:
+                                  description: Total io bandwidth capacity
+                                  type: number
+                              type: object
+                            description: The IO status for each QoS pool
+                            type: object
+                        type: object
+                      description: key -> device id
+                      type: object
+                  type: object
+                type: object
+              observedGeneration:
+                format: int64
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
