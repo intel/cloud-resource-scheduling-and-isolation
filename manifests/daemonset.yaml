@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: io-driver-daemon
+  namespace: ioi-system
+spec:
+  selector:
+    matchLabels:
+      name: daemon-io-driver
+  template:
+    metadata:
+      labels:
+        name: daemon-io-driver
+    spec:
+      serviceAccountName: io-driver
+      containers:
+        - name: io-driver
+          image: localhost:5000/iodriver:alpha
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NodeName
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName

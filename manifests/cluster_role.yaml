@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: io-driver
+  namespace: ioi-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: io-driver-role
+  # namespace: ioi-system
+rules:
+- apiGroups: ["diskio.x-k8s.io"]
+  resources: ["nodediskdevices"]
+  verbs: ["get", "create", "update"]
+- apiGroups: ["diskio.x-k8s.io"]
+  resources: 
+  - nodediskiostats
+  - nodediskiostats/status
+  verbs: ["get", "watch", "list", "update"]
+- apiGroups: 
+  - ""
+  resources:
+  - pods
+  verbs: ["get", "list"]
+--- 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: io-driver-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: io-driver-role
+subjects:
+- kind: ServiceAccount
+  name: io-driver
+  namespace: ioi-system
